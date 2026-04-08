@@ -13,6 +13,8 @@ shift || true
 EDGE_USER="${EDGE_USER:-pi1}"
 SSH_KEY="${SSH_KEY:-}"
 EDGE_PASS="${EDGE_PASS:-123}"
+EDGE_USER="${EDGE_USER:-pi}"
+SSH_KEY="${SSH_KEY:-}"
 REMOTE_DIR="${REMOTE_DIR:-~/edgeComputing-greedy}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
@@ -28,29 +30,25 @@ ssh_opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=8)
 if [[ -n "$SSH_KEY" ]]; then
   ssh_opts+=( -i "$SSH_KEY" )
 fi
-USE_SSHPASS=0
-if [[ -n "$EDGE_PASS" ]] && command -v sshpass >/dev/null 2>&1; then
-  USE_SSHPASS=1
-elif [[ -n "$EDGE_PASS" ]]; then
-  echo "[warn] sshpass not found, will fallback to normal ssh/scp interactive password input."
-fi
 
 ssh_cmd() {
   local ip="$1"; shift
-  if [[ "$USE_SSHPASS" -eq 1 ]]; then
+  if [[ -n "$EDGE_PASS" ]]; then
     sshpass -p "$EDGE_PASS" ssh "${ssh_opts[@]}" "${EDGE_USER}@${ip}" "$@"
   else
     ssh "${ssh_opts[@]}" "${EDGE_USER}@${ip}" "$@"
   fi
+  ssh "${ssh_opts[@]}" "${EDGE_USER}@${ip}" "$@"
 }
 
 scp_cmd() {
   local src="$1" dst="$2"
-  if [[ "$USE_SSHPASS" -eq 1 ]]; then
+  if [[ -n "$EDGE_PASS" ]]; then
     sshpass -p "$EDGE_PASS" scp "${ssh_opts[@]}" -r "$src" "$dst"
   else
     scp "${ssh_opts[@]}" -r "$src" "$dst"
   fi
+  scp "${ssh_opts[@]}" -r "$src" "$dst"
 }
 
 deploy_one() {
@@ -94,6 +92,17 @@ stop_one() {
 
 case "$ACTION" in
   deploy)
+    if [[ -n "$EDGE_PASS" ]] && ! command -v sshpass >/dev/null 2>&1; then
+      echo "sshpass not found. Install it or set EDGE_PASS='' and use SSH keys."
+      exit 1
+    fi
+    for ip in "${IPS[@]}"; do deploy_one "$ip"; done
+    ;;
+  start)
+    if [[ -n "$EDGE_PASS" ]] && ! command -v sshpass >/dev/null 2>&1; then
+      echo "sshpass not found. Install it or set EDGE_PASS='' and use SSH keys."
+      exit 1
+    fi
     for ip in "${IPS[@]}"; do deploy_one "$ip"; done
     ;;
   start)
@@ -101,6 +110,17 @@ case "$ACTION" in
     for ip in "${IPS[@]}"; do start_one "$ip" "$EXTRA_ARGS"; done
     ;;
   status)
+    if [[ -n "$EDGE_PASS" ]] && ! command -v sshpass >/dev/null 2>&1; then
+      echo "sshpass not found. Install it or set EDGE_PASS='' and use SSH keys."
+      exit 1
+    fi
+    for ip in "${IPS[@]}"; do status_one "$ip"; done
+    ;;
+  stop)
+    if [[ -n "$EDGE_PASS" ]] && ! command -v sshpass >/dev/null 2>&1; then
+      echo "sshpass not found. Install it or set EDGE_PASS='' and use SSH keys."
+      exit 1
+    fi
     for ip in "${IPS[@]}"; do status_one "$ip"; done
     ;;
   stop)
