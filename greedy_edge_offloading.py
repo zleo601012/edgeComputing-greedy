@@ -13,6 +13,9 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
@@ -117,6 +120,14 @@ NODE_HOST = {
     "pi7": "192.168.1.177",
 }
 IP_TO_EXEC_NODE = {ip: node for node, ip in NODE_HOST.items()}
+# Optional HTTP endpoint mapping (same host by default, per-port services).
+NODE_HOST = {
+    "pi1": "127.0.0.1",
+    "pi2": "127.0.0.1",
+    "pi3": "127.0.0.1",
+    "pi4": "127.0.0.1",
+    "pi7": "127.0.0.1",
+}
 
 
 @dataclass
@@ -420,6 +431,10 @@ def simulate(
     local_source_only: bool,
     state_file: Path,
     serve_state: bool,
+    num_slots: int,
+    output_dir: Path,
+    seed: int,
+    call_services: bool,
 ) -> None:
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -468,6 +483,10 @@ def simulate(
     result_files = {
         node: output_dir / f"result_{node}.csv"
         for node in result_nodes
+
+    result_files = {
+        node: output_dir / f"result_{node}.csv"
+        for node in DATASET_MAP
     }
     fieldnames = [
         "slot_id",
@@ -492,6 +511,8 @@ def simulate(
             writer = csv.DictWriter(fh, fieldnames=fieldnames)
             if write_header:
                 writer.writeheader()
+        with path.open("w", encoding="utf-8", newline="") as fh:
+            csv.DictWriter(fh, fieldnames=fieldnames).writeheader()
 
     for slot_id in range(start_slot, start_slot + num_slots):
         slot_start_t = slot_id * SLOT_SECONDS
@@ -502,6 +523,7 @@ def simulate(
         if local_source_only:
             source_nodes = [EXEC_TO_SOURCE_NODE[local_exec_node]]  # type: ignore[index]
         for source_node in source_nodes:
+        for source_node in DATASET_MAP:
             rows = build_window(dataset_rows[source_node], slot_id)
             for service_port in SERVICE_PORTS:
                 arrival_time = slot_start_t + rng.uniform(0.0, SLOT_SECONDS)
@@ -549,6 +571,7 @@ def simulate(
                     }
                 else:
                     m = predict_task_times(available_time, task, exec_node, source_exec_node)
+                m = predict_task_times(available_time, task, exec_node, source_exec_node)
                 if best_metrics is None or m["total_latency"] < best_metrics["total_latency"]:
                     best_node = exec_node
                     best_metrics = m
@@ -576,6 +599,9 @@ def simulate(
             else:
                 core_id = int(best_metrics["core_id"])
                 available_time[best_node][core_id] = best_metrics["finish_time"]
+            assert best_node is not None and best_metrics is not None
+            core_id = int(best_metrics["core_id"])
+            available_time[best_node][core_id] = best_metrics["finish_time"]
 
             if call_services:
                 result = invoke_microservice(best_node, task)
@@ -617,6 +643,8 @@ def simulate(
         f"outputs={output_dir}"
     )
 
+    print(f"Simulation done. slots=[{start_slot}, {start_slot + num_slots - 1}] outputs={output_dir}")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Greedy edge offloading minimal runner")
@@ -652,6 +680,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Serve this node's core availability on :7000/scheduler_state for peer estimation",
     )
+    parser.add_argument("--num-slots", type=int, default=3, help="How many slots to run")
+    parser.add_argument("--seed", type=int, default=20260408)
+    parser.add_argument("--output-dir", type=Path, default=Path("results"))
+    parser.add_argument("--call-services", action="store_true", help="Enable real HTTP microservice calls")
     return parser.parse_args()
 
 
