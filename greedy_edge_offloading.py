@@ -431,10 +431,6 @@ def simulate(
     local_source_only: bool,
     state_file: Path,
     serve_state: bool,
-    num_slots: int,
-    output_dir: Path,
-    seed: int,
-    call_services: bool,
 ) -> None:
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -483,10 +479,6 @@ def simulate(
     result_files = {
         node: output_dir / f"result_{node}.csv"
         for node in result_nodes
-
-    result_files = {
-        node: output_dir / f"result_{node}.csv"
-        for node in DATASET_MAP
     }
     fieldnames = [
         "slot_id",
@@ -511,8 +503,6 @@ def simulate(
             writer = csv.DictWriter(fh, fieldnames=fieldnames)
             if write_header:
                 writer.writeheader()
-        with path.open("w", encoding="utf-8", newline="") as fh:
-            csv.DictWriter(fh, fieldnames=fieldnames).writeheader()
 
     for slot_id in range(start_slot, start_slot + num_slots):
         slot_start_t = slot_id * SLOT_SECONDS
@@ -523,7 +513,6 @@ def simulate(
         if local_source_only:
             source_nodes = [EXEC_TO_SOURCE_NODE[local_exec_node]]  # type: ignore[index]
         for source_node in source_nodes:
-        for source_node in DATASET_MAP:
             rows = build_window(dataset_rows[source_node], slot_id)
             for service_port in SERVICE_PORTS:
                 arrival_time = slot_start_t + rng.uniform(0.0, SLOT_SECONDS)
@@ -571,7 +560,6 @@ def simulate(
                     }
                 else:
                     m = predict_task_times(available_time, task, exec_node, source_exec_node)
-                m = predict_task_times(available_time, task, exec_node, source_exec_node)
                 if best_metrics is None or m["total_latency"] < best_metrics["total_latency"]:
                     best_node = exec_node
                     best_metrics = m
@@ -599,9 +587,6 @@ def simulate(
             else:
                 core_id = int(best_metrics["core_id"])
                 available_time[best_node][core_id] = best_metrics["finish_time"]
-            assert best_node is not None and best_metrics is not None
-            core_id = int(best_metrics["core_id"])
-            available_time[best_node][core_id] = best_metrics["finish_time"]
 
             if call_services:
                 result = invoke_microservice(best_node, task)
@@ -642,8 +627,6 @@ def simulate(
         f"Simulation done. slots=[{start_slot}, {start_slot + num_slots - 1}] "
         f"outputs={output_dir}"
     )
-
-    print(f"Simulation done. slots=[{start_slot}, {start_slot + num_slots - 1}] outputs={output_dir}")
 
 
 def parse_args() -> argparse.Namespace:
