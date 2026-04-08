@@ -33,6 +33,7 @@ USERS=(
 )
 
 ssh_opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=8)
+ssh_opts+=(-o ControlMaster=auto -o ControlPersist=10m -o ControlPath=/tmp/edge_mux_%r_%h_%p)
 if [[ -n "$SSH_KEY" ]]; then
   ssh_opts+=( -i "$SSH_KEY" )
 fi
@@ -65,12 +66,12 @@ deploy_one() {
   local ip="$1" user="$2"
   echo "[deploy] ${ip} as ${user}"
   ssh_cmd "$ip" "$user" "mkdir -p ${REMOTE_DIR}/dataset ${REMOTE_DIR}/runtime_state ${REMOTE_DIR}/results"
-  scp_cmd "greedy_edge_offloading.py" "${user}@${ip}:${REMOTE_DIR}/greedy_edge_offloading.py"
-  scp_cmd "dataset/node_1.csv" "${user}@${ip}:${REMOTE_DIR}/dataset/node_1.csv"
-  scp_cmd "dataset/node_2.csv" "${user}@${ip}:${REMOTE_DIR}/dataset/node_2.csv"
-  scp_cmd "dataset/node_3.csv" "${user}@${ip}:${REMOTE_DIR}/dataset/node_3.csv"
-  scp_cmd "dataset/node_4.csv" "${user}@${ip}:${REMOTE_DIR}/dataset/node_4.csv"
-  scp_cmd "dataset/node_5.csv" "${user}@${ip}:${REMOTE_DIR}/dataset/node_5.csv"
+  local bundle
+  bundle="$(mktemp /tmp/edge_bundle_XXXXXX.tar.gz)"
+  tar -czf "$bundle" greedy_edge_offloading.py dataset/node_1.csv dataset/node_2.csv dataset/node_3.csv dataset/node_4.csv dataset/node_5.csv
+  scp_cmd "$bundle" "${user}@${ip}:${REMOTE_DIR}/edge_bundle.tar.gz"
+  ssh_cmd "$ip" "$user" "cd ${REMOTE_DIR} && tar -xzf edge_bundle.tar.gz && rm -f edge_bundle.tar.gz"
+  rm -f "$bundle"
 }
 
 start_one() {
