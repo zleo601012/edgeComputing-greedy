@@ -13,9 +13,6 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import urllib.error
-import urllib.request
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
@@ -120,14 +117,6 @@ NODE_HOST = {
     "pi7": "192.168.1.177",
 }
 IP_TO_EXEC_NODE = {ip: node for node, ip in NODE_HOST.items()}
-# Optional HTTP endpoint mapping (same host by default, per-port services).
-NODE_HOST = {
-    "pi1": "127.0.0.1",
-    "pi2": "127.0.0.1",
-    "pi3": "127.0.0.1",
-    "pi4": "127.0.0.1",
-    "pi7": "127.0.0.1",
-}
 
 
 @dataclass
@@ -663,10 +652,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Serve this node's core availability on :7000/scheduler_state for peer estimation",
     )
-    parser.add_argument("--num-slots", type=int, default=3, help="How many slots to run")
-    parser.add_argument("--seed", type=int, default=20260408)
-    parser.add_argument("--output-dir", type=Path, default=Path("results"))
-    parser.add_argument("--call-services", action="store_true", help="Enable real HTTP microservice calls")
     return parser.parse_args()
 
 
