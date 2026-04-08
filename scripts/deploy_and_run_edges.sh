@@ -86,7 +86,7 @@ start_one() {
     --call-services \
     --local-ip ${ip} \
     --state-file ${state_name} \
-    ${extra_args} > ${log_name} 2>&1 & echo \\$!"
+    ${extra_args} > ${log_name} 2>&1 &"
 }
 
 status_one() {
