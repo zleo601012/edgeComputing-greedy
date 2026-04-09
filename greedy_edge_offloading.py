@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Minimal runnable greedy edge task offloading simulator."""
 
-from __future__ import annotations
-
 import argparse
 import csv
 import json
@@ -11,10 +9,9 @@ import socket
 import threading
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 # =========================
@@ -119,14 +116,22 @@ NODE_HOST = {
 IP_TO_EXEC_NODE = {ip: node for node, ip in NODE_HOST.items()}
 
 
-@dataclass
 class Task:
-    task_id: str
-    slot_id: int
-    source_node: str
-    service_port: int
-    arrival_time: float
-    rows: List[List[float]]
+    def __init__(
+        self,
+        task_id: str,
+        slot_id: int,
+        source_node: str,
+        service_port: int,
+        arrival_time: float,
+        rows: List[List[float]],
+    ) -> None:
+        self.task_id = task_id
+        self.slot_id = slot_id
+        self.source_node = source_node
+        self.service_port = service_port
+        self.arrival_time = arrival_time
+        self.rows = rows
 
 
 def detect_local_ip() -> str:
@@ -140,7 +145,7 @@ def detect_local_ip() -> str:
         return "127.0.0.1"
 
 
-def detect_local_exec_node(override_ip: str | None = None) -> str | None:
+def detect_local_exec_node(override_ip: Optional[str] = None) -> Optional[str]:
     ip = override_ip or detect_local_ip()
     return IP_TO_EXEC_NODE.get(ip)
 
@@ -230,7 +235,7 @@ def start_state_server(
     return server
 
 
-def query_remote_available_time(exec_node: str, timeout_s: float = 0.8) -> List[float] | None:
+def query_remote_available_time(exec_node: str, timeout_s: float = 0.8) -> Optional[List[float]]:
     host = NODE_HOST[exec_node]
     url = f"http://{host}:7000/scheduler_state"
     try:
@@ -250,7 +255,7 @@ def reserve_remote_slot(
     service_port: int,
     source_exec_node: str,
     timeout_s: float = 1.2,
-) -> Dict[str, float] | None:
+) -> Optional[Dict[str, float]]:
     """Atomically reserve a remote node core so task joins its real queue."""
     host = NODE_HOST[exec_node]
     url = f"http://{host}:7000/reserve"
@@ -412,11 +417,11 @@ def invoke_microservice(exec_node: str, task: Task, timeout_s: float = 5.0) -> D
 
 def simulate(
     start_slot: int,
-    num_slots: int | None,
+    num_slots: Optional[int],
     output_dir: Path,
     seed: int,
     call_services: bool,
-    local_ip: str | None,
+    local_ip: Optional[str],
     local_source_only: bool,
     state_file: Path,
     serve_state: bool,

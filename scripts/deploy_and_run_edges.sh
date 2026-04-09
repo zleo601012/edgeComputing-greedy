@@ -31,6 +31,13 @@ USERS=(
   "${EDGE_USER_PI4:-pi4}"
   "${EDGE_USER_PI7:-pi7}"
 )
+PYTHON_BINS=(
+  "${PYTHON_BIN_PI1:-$PYTHON_BIN}"
+  "${PYTHON_BIN_PI2:-$PYTHON_BIN}"
+  "${PYTHON_BIN_PI3:-$PYTHON_BIN}"
+  "${PYTHON_BIN_PI4:-$PYTHON_BIN}"
+  "${PYTHON_BIN_PI7:-$PYTHON_BIN}"
+)
 
 ssh_opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=8)
 ssh_opts+=(-o ControlMaster=auto -o ControlPersist=10m -o ControlPath=/tmp/edge_mux_%r_%h_%p)
@@ -75,12 +82,16 @@ deploy_one() {
 }
 
 start_one() {
-  local ip="$1" user="$2"; shift 2
+  local ip="$1" user="$2" py_bin="$3"; shift 3
   local extra_args="$*"
   local log_name="edge_scheduler_${ip//./_}.log"
   local state_name="runtime_state/state_${ip//./_}.json"
-  echo "[start] ${ip} as ${user}"
-  ssh_cmd "$ip" "$user" "cd ${REMOTE_DIR} && nohup ${PYTHON_BIN} greedy_edge_offloading.py \
+  echo "[start] ${ip} as ${user} (python=${py_bin})"
+  if ! ssh_cmd "$ip" "$user" "${py_bin} -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,6) else 1)'"; then
+    echo "[start] ${ip} skipped: ${py_bin} is lower than Python 3.6"
+    return 0
+  fi
+  ssh_cmd "$ip" "$user" "cd ${REMOTE_DIR} && nohup ${py_bin} greedy_edge_offloading.py \
     --local-source-only \
     --serve-state \
     --call-services \
@@ -120,7 +131,7 @@ case "$ACTION" in
     ;;
   start)
     EXTRA_ARGS="$*"
-    for i in "${!IPS[@]}"; do start_one "${IPS[$i]}" "${USERS[$i]}" "$EXTRA_ARGS"; done
+    for i in "${!IPS[@]}"; do start_one "${IPS[$i]}" "${USERS[$i]}" "${PYTHON_BINS[$i]}" "$EXTRA_ARGS"; done
     ;;
   status)
     for i in "${!IPS[@]}"; do status_one "${IPS[$i]}" "${USERS[$i]}"; done
