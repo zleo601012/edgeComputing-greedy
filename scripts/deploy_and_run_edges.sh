@@ -92,10 +92,11 @@ start_one() {
 status_one() {
   local ip="$1" user="$2"
   local log_name="edge_scheduler_${ip//./_}.log"
+  local proc_pat="python(3)? .*greedy_edge_offloading.py"
   echo "[status] ${ip} as ${user}"
   ssh_cmd "$ip" "$user" "set -e; \
-    if pgrep -af 'greedy_edge_offloading.py' >/dev/null; then \
-      pgrep -af 'greedy_edge_offloading.py'; \
+    if pgrep -af '${proc_pat}' >/dev/null; then \
+      pgrep -af '${proc_pat}'; \
     else \
       echo 'NOT_RUNNING'; \
       if [ -f ${REMOTE_DIR}/${log_name} ]; then \
