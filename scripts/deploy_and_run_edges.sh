@@ -162,28 +162,43 @@ clean_one() {
     mkdir -p ${remote_results} ${remote_runtime} ${REMOTE_DIR}/dataset"
 }
 
+run_all_nodes() {
+  local fn="$1"; shift || true
+  local extra="$*"
+  local failed=()
+  for i in "${!IPS[@]}"; do
+    if ! "$fn" "${IPS[$i]}" "${USERS[$i]}" "${PYTHON_BINS[$i]}" "$extra"; then
+      failed+=("${IPS[$i]}")
+      echo "[error] ${fn} failed on ${IPS[$i]}"
+    fi
+  done
+  if [[ "${#failed[@]}" -gt 0 ]]; then
+    echo "[error] nodes failed: ${failed[*]}"
+    return 1
+  fi
+  return 0
+}
+
 case "$ACTION" in
   deploy)
-    for i in "${!IPS[@]}"; do deploy_one "${IPS[$i]}" "${USERS[$i]}"; done
+    run_all_nodes deploy_one
     ;;
   start)
-    EXTRA_ARGS="$*"
-    for i in "${!IPS[@]}"; do start_one "${IPS[$i]}" "${USERS[$i]}" "${PYTHON_BINS[$i]}" "$EXTRA_ARGS"; done
+    run_all_nodes start_one "$*"
     ;;
   status)
-    for i in "${!IPS[@]}"; do status_one "${IPS[$i]}" "${USERS[$i]}"; done
+    run_all_nodes status_one
     ;;
   stop)
-    for i in "${!IPS[@]}"; do stop_one "${IPS[$i]}" "${USERS[$i]}"; done
+    run_all_nodes stop_one
     ;;
   clean)
-    for i in "${!IPS[@]}"; do clean_one "${IPS[$i]}" "${USERS[$i]}"; done
+    run_all_nodes clean_one
     ;;
   restart)
-    EXTRA_ARGS="$*"
-    for i in "${!IPS[@]}"; do clean_one "${IPS[$i]}" "${USERS[$i]}"; done
-    for i in "${!IPS[@]}"; do deploy_one "${IPS[$i]}" "${USERS[$i]}"; done
-    for i in "${!IPS[@]}"; do start_one "${IPS[$i]}" "${USERS[$i]}" "${PYTHON_BINS[$i]}" "$EXTRA_ARGS"; done
+    run_all_nodes clean_one
+    run_all_nodes deploy_one
+    run_all_nodes start_one "$*"
     ;;
   *)
     echo "Unknown action: '$ACTION'"
