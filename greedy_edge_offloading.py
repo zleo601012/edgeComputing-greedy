@@ -438,6 +438,7 @@ def simulate(
     realtime: bool,
     reset_state: bool,
     truncate_results: bool,
+    slot_label_start: int,
 ) -> None:
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -491,6 +492,7 @@ def simulate(
     }
     fieldnames = [
         "slot_id",
+        "raw_slot_id",
         "task_id",
         "source_node",
         "exec_node",
@@ -635,7 +637,8 @@ def simulate(
             actual_total_time = http_elapsed_time if call_services else None
 
             row = {
-                "slot_id": task.slot_id,
+                "slot_id": (task.slot_id - start_slot + slot_label_start),
+                "raw_slot_id": task.slot_id,
                 "task_id": task.task_id,
                 "source_node": task.source_node,
                 "exec_node": best_node,
@@ -710,6 +713,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Delete existing result_node*.csv in output-dir before writing",
     )
+    parser.add_argument(
+        "--slot-label-start",
+        type=int,
+        default=1,
+        help="First slot number written to CSV (display label only; scheduling still uses dataset index)",
+    )
     realtime_group = parser.add_mutually_exclusive_group()
     realtime_group.add_argument(
         "--realtime",
@@ -742,6 +751,7 @@ def main() -> None:
         realtime=args.realtime,
         reset_state=args.reset_state,
         truncate_results=args.truncate_results,
+        slot_label_start=args.slot_label_start,
     )
 
 
