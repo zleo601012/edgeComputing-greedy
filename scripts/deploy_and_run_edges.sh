@@ -123,7 +123,9 @@ start_one() {
     --call-services \
     --local-ip ${ip} \
     --state-file ${state_name} \
-    ${extra_args} > ${log_name} 2>&1 &"
+    ${extra_args} > ${log_name} 2>&1 < /dev/null & \
+    disown || true; \
+    exit 0"
 }
 
 status_one() {
@@ -157,11 +159,11 @@ clean_one() {
   local remote_runtime="${REMOTE_DIR}/runtime_state"
   local remote_logs="${REMOTE_DIR}/edge_scheduler_*.log"
   echo "[clean] ${ip} as ${user}"
-  ssh_cmd "$ip" "$user" "set -e; \
-    pkill -f 'greedy_edge_offloading.py' || true; \
-    rm -rf ${remote_results} ${remote_runtime}; \
-    rm -f ${remote_logs}; \
-    mkdir -p ${remote_results} ${remote_runtime} ${REMOTE_DIR}/dataset"
+  ssh_cmd "$ip" "$user" "pkill -f 'greedy_edge_offloading.py' || true; \
+    rm -rf ${remote_results} ${remote_runtime} || true; \
+    rm -f ${remote_logs} || true; \
+    mkdir -p ${remote_results} ${remote_runtime} ${REMOTE_DIR}/dataset || true; \
+    true"
 }
 
 run_all_nodes() {
