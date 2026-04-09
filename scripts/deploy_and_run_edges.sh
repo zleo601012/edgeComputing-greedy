@@ -46,7 +46,6 @@ PYTHON_BINS=(
 )
 
 ssh_opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=8)
-ssh_opts+=(-o ControlMaster=auto -o ControlPersist=10m -o ControlPath=/tmp/edge_mux_%r_%h_%p)
 if [[ -n "$SSH_KEY" ]]; then
   ssh_opts+=( -i "$SSH_KEY" )
 fi
@@ -55,6 +54,9 @@ if [[ -n "$EDGE_PASS" ]] && command -v sshpass >/dev/null 2>&1; then
   USE_SSHPASS=1
 elif [[ -n "$EDGE_PASS" ]]; then
   echo "[info] sshpass unavailable; continuing with interactive ssh/scp password prompts."
+fi
+if [[ "$USE_SSHPASS" -eq 0 ]]; then
+  ssh_opts+=(-o ControlMaster=auto -o ControlPersist=10m -o ControlPath=/tmp/edge_mux_%r_%h_%p)
 fi
 
 ssh_cmd() {
