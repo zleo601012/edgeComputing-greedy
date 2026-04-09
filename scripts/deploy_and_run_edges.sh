@@ -4,6 +4,8 @@ set -euo pipefail
 # Usage examples:
 #   bash scripts/deploy_and_run_edges.sh deploy
 #   bash scripts/deploy_and_run_edges.sh start --num-slots 20
+#   bash scripts/deploy_and_run_edges.sh clean
+#   bash scripts/deploy_and_run_edges.sh restart --num-slots 20
 #   bash scripts/deploy_and_run_edges.sh status
 #   bash scripts/deploy_and_run_edges.sh stop
 
@@ -147,6 +149,19 @@ stop_one() {
   ssh_cmd "$ip" "$user" "pkill -f 'greedy_edge_offloading.py' || true"
 }
 
+clean_one() {
+  local ip="$1" user="$2"
+  local remote_results="${REMOTE_DIR}/results"
+  local remote_runtime="${REMOTE_DIR}/runtime_state"
+  local remote_logs="${REMOTE_DIR}/edge_scheduler_*.log"
+  echo "[clean] ${ip} as ${user}"
+  ssh_cmd "$ip" "$user" "set -e; \
+    pkill -f 'greedy_edge_offloading.py' || true; \
+    rm -rf ${remote_results} ${remote_runtime}; \
+    rm -f ${remote_logs}; \
+    mkdir -p ${remote_results} ${remote_runtime} ${REMOTE_DIR}/dataset"
+}
+
 case "$ACTION" in
   deploy)
     for i in "${!IPS[@]}"; do deploy_one "${IPS[$i]}" "${USERS[$i]}"; done
@@ -161,9 +176,18 @@ case "$ACTION" in
   stop)
     for i in "${!IPS[@]}"; do stop_one "${IPS[$i]}" "${USERS[$i]}"; done
     ;;
+  clean)
+    for i in "${!IPS[@]}"; do clean_one "${IPS[$i]}" "${USERS[$i]}"; done
+    ;;
+  restart)
+    EXTRA_ARGS="$*"
+    for i in "${!IPS[@]}"; do clean_one "${IPS[$i]}" "${USERS[$i]}"; done
+    for i in "${!IPS[@]}"; do deploy_one "${IPS[$i]}" "${USERS[$i]}"; done
+    for i in "${!IPS[@]}"; do start_one "${IPS[$i]}" "${USERS[$i]}" "${PYTHON_BINS[$i]}" "$EXTRA_ARGS"; done
+    ;;
   *)
     echo "Unknown action: '$ACTION'"
-    echo "Usage: bash scripts/deploy_and_run_edges.sh {deploy|start|status|stop} [extra start args]"
+    echo "Usage: bash scripts/deploy_and_run_edges.sh {deploy|start|status|stop|clean|restart} [extra start args]"
     exit 1
     ;;
 esac
