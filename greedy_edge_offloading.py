@@ -416,6 +416,15 @@ def invoke_microservice(exec_node: str, task: Task, timeout_s: float = 5.0) -> D
     }
 
 
+def _to_float_or_none(value: object) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def simulate(
     start_slot: int,
     num_slots: Optional[int],
@@ -487,12 +496,16 @@ def simulate(
         "exec_node",
         "service_port",
         "arrival_time",
-        "tx_time",
-        "wait_time",
-        "comp_time",
-        "start_time",
-        "finish_time",
-        "total_latency",
+        "pred_tx_time",
+        "pred_wait_time",
+        "pred_comp_time",
+        "pred_start_time",
+        "pred_finish_time",
+        "pred_total_latency",
+        "actual_tx_time",
+        "actual_exec_time",
+        "actual_total_time",
+        "http_elapsed_time",
         "score",
         "service_name",
         "latency_s",
@@ -600,6 +613,7 @@ def simulate(
                 core_id = int(best_metrics["core_id"])
                 available_time[best_node][core_id] = best_metrics["finish_time"]
 
+            req_start = time.time()
             if call_services:
                 result = invoke_microservice(best_node, task)
             else:
@@ -612,6 +626,13 @@ def simulate(
                     "score": 0.0,
                     "latency_s": None,
                 }
+            req_end = time.time()
+            http_elapsed_time = req_end - req_start
+            actual_exec_time = _to_float_or_none(result.get("latency_s"))
+            actual_tx_time = None
+            if actual_exec_time is not None:
+                actual_tx_time = max(0.0, http_elapsed_time - actual_exec_time)
+            actual_total_time = http_elapsed_time if call_services else None
 
             row = {
                 "slot_id": task.slot_id,
@@ -620,12 +641,16 @@ def simulate(
                 "exec_node": best_node,
                 "service_port": task.service_port,
                 "arrival_time": f"{task.arrival_time:.6f}",
-                "tx_time": f"{best_metrics['tx_time']:.6f}",
-                "wait_time": f"{best_metrics['wait_time']:.6f}",
-                "comp_time": f"{best_metrics['comp_time']:.6f}",
-                "start_time": f"{best_metrics['start_time']:.6f}",
-                "finish_time": f"{best_metrics['finish_time']:.6f}",
-                "total_latency": f"{best_metrics['total_latency']:.6f}",
+                "pred_tx_time": f"{best_metrics['tx_time']:.6f}",
+                "pred_wait_time": f"{best_metrics['wait_time']:.6f}",
+                "pred_comp_time": f"{best_metrics['comp_time']:.6f}",
+                "pred_start_time": f"{best_metrics['start_time']:.6f}",
+                "pred_finish_time": f"{best_metrics['finish_time']:.6f}",
+                "pred_total_latency": f"{best_metrics['total_latency']:.6f}",
+                "actual_tx_time": "" if actual_tx_time is None else f"{actual_tx_time:.6f}",
+                "actual_exec_time": "" if actual_exec_time is None else f"{actual_exec_time:.6f}",
+                "actual_total_time": "" if actual_total_time is None else f"{actual_total_time:.6f}",
+                "http_elapsed_time": f"{http_elapsed_time:.6f}",
                 "score": result.get("score", ""),
                 "service_name": result.get("service", f"svc-{task.service_port}"),
                 "latency_s": result.get("latency_s", ""),
