@@ -427,6 +427,8 @@ def simulate(
     state_file: Path,
     serve_state: bool,
     realtime: bool,
+    reset_state: bool,
+    truncate_results: bool,
 ) -> None:
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -465,6 +467,8 @@ def simulate(
     if serve_state and local_exec_node:
         start_state_server(local_exec_node=local_exec_node, available_time=available_time)
 
+    if reset_state and state_file.exists():
+        state_file.unlink()
     progress = load_progress(state_file)
     if start_slot < int(progress.get("next_slot", WINDOW_SIZE - 1)):
         start_slot = int(progress.get("next_slot", WINDOW_SIZE - 1))
@@ -494,6 +498,8 @@ def simulate(
         "latency_s",
     ]
     for path in result_files.values():
+        if truncate_results and path.exists():
+            path.unlink()
         write_header = not path.exists() or path.stat().st_size == 0
         with path.open("a", encoding="utf-8", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=fieldnames)
@@ -670,10 +676,29 @@ def parse_args() -> argparse.Namespace:
         help="Serve this node's core availability on :7000/scheduler_state for peer estimation",
     )
     parser.add_argument(
-        "--realtime",
+        "--reset-state",
         action="store_true",
-        help="Use wall-clock pacing: arrivals are released over real 60s slots instead of immediate simulation",
+        help="Ignore/delete previous state file and start from --start-slot",
     )
+    parser.add_argument(
+        "--truncate-results",
+        action="store_true",
+        help="Delete existing result_node*.csv in output-dir before writing",
+    )
+    realtime_group = parser.add_mutually_exclusive_group()
+    realtime_group.add_argument(
+        "--realtime",
+        dest="realtime",
+        action="store_true",
+        help="Use wall-clock pacing (default): arrivals are released over real 60s slots",
+    )
+    realtime_group.add_argument(
+        "--no-realtime",
+        dest="realtime",
+        action="store_false",
+        help="Disable wall-clock pacing and run as fast as possible",
+    )
+    parser.set_defaults(realtime=True)
     return parser.parse_args()
 
 
@@ -690,6 +715,8 @@ def main() -> None:
         state_file=args.state_file,
         serve_state=args.serve_state,
         realtime=args.realtime,
+        reset_state=args.reset_state,
+        truncate_results=args.truncate_results,
     )
 
 

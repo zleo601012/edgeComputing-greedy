@@ -16,6 +16,10 @@ SSH_KEY="${SSH_KEY:-}"
 EDGE_PASS="${EDGE_PASS:-123}"
 REMOTE_DIR="${REMOTE_DIR:-~/edgeComputing-greedy}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+# Optional hard timeout (seconds) for ssh/scp commands.
+# Default is disabled so long-running start/deploy operations are not killed.
+# Set SSH_CMD_TIMEOUT to a positive integer to enable.
+SSH_CMD_TIMEOUT="${SSH_CMD_TIMEOUT:-0}"
 
 IPS=(
   "192.168.1.167" # pi1
@@ -53,19 +57,37 @@ fi
 
 ssh_cmd() {
   local ip="$1" user="$2"; shift 2
-  if [[ "$USE_SSHPASS" -eq 1 ]]; then
-    sshpass -p "$EDGE_PASS" ssh "${ssh_opts[@]}" "${user}@${ip}" "$@"
+  if [[ "${SSH_CMD_TIMEOUT}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[ssh] ${user}@${ip} (hard-timeout=${SSH_CMD_TIMEOUT}s)"
+    if [[ "$USE_SSHPASS" -eq 1 ]]; then
+      timeout "${SSH_CMD_TIMEOUT}" sshpass -p "$EDGE_PASS" ssh "${ssh_opts[@]}" "${user}@${ip}" "$@"
+    else
+      timeout "${SSH_CMD_TIMEOUT}" ssh "${ssh_opts[@]}" "${user}@${ip}" "$@"
+    fi
   else
-    ssh "${ssh_opts[@]}" "${user}@${ip}" "$@"
+    echo "[ssh] ${user}@${ip} (hard-timeout=disabled)"
+    if [[ "$USE_SSHPASS" -eq 1 ]]; then
+      sshpass -p "$EDGE_PASS" ssh "${ssh_opts[@]}" "${user}@${ip}" "$@"
+    else
+      ssh "${ssh_opts[@]}" "${user}@${ip}" "$@"
+    fi
   fi
 }
 
 scp_cmd() {
   local src="$1" dst="$2"
-  if [[ "$USE_SSHPASS" -eq 1 ]]; then
-    sshpass -p "$EDGE_PASS" scp "${ssh_opts[@]}" -r "$src" "$dst"
+  if [[ "${SSH_CMD_TIMEOUT}" =~ ^[1-9][0-9]*$ ]]; then
+    if [[ "$USE_SSHPASS" -eq 1 ]]; then
+      timeout "${SSH_CMD_TIMEOUT}" sshpass -p "$EDGE_PASS" scp "${ssh_opts[@]}" -r "$src" "$dst"
+    else
+      timeout "${SSH_CMD_TIMEOUT}" scp "${ssh_opts[@]}" -r "$src" "$dst"
+    fi
   else
-    scp "${ssh_opts[@]}" -r "$src" "$dst"
+    if [[ "$USE_SSHPASS" -eq 1 ]]; then
+      sshpass -p "$EDGE_PASS" scp "${ssh_opts[@]}" -r "$src" "$dst"
+    else
+      scp "${ssh_opts[@]}" -r "$src" "$dst"
+    fi
   fi
 }
 
