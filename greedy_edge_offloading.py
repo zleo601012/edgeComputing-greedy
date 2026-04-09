@@ -7,6 +7,7 @@ import json
 import random
 import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -425,6 +426,7 @@ def simulate(
     local_source_only: bool,
     state_file: Path,
     serve_state: bool,
+    realtime: bool,
 ) -> None:
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -498,8 +500,12 @@ def simulate(
             if write_header:
                 writer.writeheader()
 
+    realtime_start_wall = time.time()
+
     for slot_id in range(start_slot, start_slot + num_slots):
         slot_start_t = slot_id * SLOT_SECONDS
+        slot_index = slot_id - start_slot
+        slot_wall_start = realtime_start_wall + slot_index * SLOT_SECONDS
         tasks: List[Task] = []
 
         # Step 1 + 2 + 3: Build window, generate 12 tasks/node, assign random arrivals.
@@ -525,6 +531,12 @@ def simulate(
 
         # Step 5/6/7: greedy scheduling + execute/capture result.
         for task in tasks:
+            if realtime:
+                # Enforce real-time arrival: task i arrives at its sampled timestamp inside the slot.
+                target_wall = slot_wall_start + (task.arrival_time - slot_start_t)
+                sleep_s = target_wall - time.time()
+                if sleep_s > 0:
+                    time.sleep(sleep_s)
             source_exec_node = SOURCE_TO_EXEC_NODE[task.source_node]
 
             best_node = None
@@ -657,6 +669,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Serve this node's core availability on :7000/scheduler_state for peer estimation",
     )
+    parser.add_argument(
+        "--realtime",
+        action="store_true",
+        help="Use wall-clock pacing: arrivals are released over real 60s slots instead of immediate simulation",
+    )
     return parser.parse_args()
 
 
@@ -672,6 +689,7 @@ def main() -> None:
         local_source_only=args.local_source_only,
         state_file=args.state_file,
         serve_state=args.serve_state,
+        realtime=args.realtime,
     )
 
 
